@@ -3,9 +3,10 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/mattn/go-sqlite3"
+	"modernc.org/sqlite"
 )
 
 type authRequest struct {
@@ -29,7 +30,11 @@ func (h *Handler) Register(c *fiber.Ctx) error {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return c.Status(http.StatusCreated).JSON(fiber.Map{"id": res.(int64)})
+	id, ok := res.(int64)
+	if !ok {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "unexpected response type"})
+	}
+	return c.Status(http.StatusCreated).JSON(fiber.Map{"id": id})
 }
 
 func (h *Handler) Login(c *fiber.Ctx) error {
@@ -58,10 +63,20 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 	return c.JSON(res)
 }
 
+// Detect UNIQUE constraint violations with modernc.org/sqlite.
+// First try typed match; then fall back to stable message fragment.
+
 func isUniqueViolation(err error) bool {
-	var sqliteErr sqlite3.Error
-	if errors.As(err, &sqliteErr) {
-		return sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique
+	var se *sqlite.Error
+	if errors.As(err, &se) {
+		// modernc exposes extended codes via Code()
+		const sqliteConstraintUnique = 2067 // SQLITE_CONSTRAINT_UNIQUE
+		if int(se.Code()) == sqliteConstraintUnique {
+			return true
+		}
 	}
-	return false
+
+	// Fallback (safe backup)
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unique constraint failed")
 }
