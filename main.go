@@ -10,7 +10,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/recover
+	"github.com/joho/godotenv"
 
 	"vault/internal/config"
 	"vault/internal/db"
@@ -21,6 +22,7 @@ import (
 )
 
 func main() {
+	_=godotenv.Load()
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("config error: %v", err)
